@@ -1,0 +1,1 @@
+Cron manager para isotracker con progreso.

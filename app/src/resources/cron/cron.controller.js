@@ -4,7 +4,7 @@ var format = require('date-format');
 var cron = require('node-cron');
 const csv=require('csvtojson')
 
-cron.schedule('0 */5 * * * *', async () => {
+cron.schedule('0 */1 * * * *', async () => {
     await uploadReportPeriod()
     const timeoutObj = setTimeout(() => {
       downloadIssuedTo3D()
@@ -15,16 +15,16 @@ cron.schedule('0 */5 * * * *', async () => {
     console.log("empieza dpipes")
     await csv()
     .fromFile(process.env.NODE_DPIPES_ROUTE)
-    .then((jsonObj)=>{
+    .then(async(jsonObj)=>{
         const csv = jsonObj
   
-        sql.query("SELECT isoid, tpipes_id FROM dpipes_view", (err, results) =>{
+        await sql.query("SELECT isoid, tpipes_id FROM dpipes_view", async (err, results) =>{
           if(!results[0]){
             console.log("No existe")
           }else{
             const isoids = results
             for(let i = 0; i < isoids.length; i++){
-              sql.query('UPDATE misoctrls set before_tpipes_id = ? WHERE isoid COLLATE utf8mb4_unicode_ci = ?', [isoids[i].tpipes_id, isoids[i].isoid], (err, results)=>{
+              await sql.query('UPDATE misoctrls set before_tpipes_id = ? WHERE isoid COLLATE utf8mb4_unicode_ci = ?', [isoids[i].tpipes_id, isoids[i].isoid], (err, results)=>{
                 if(err){
                   console.log("Error updating")
                 }
@@ -33,27 +33,27 @@ cron.schedule('0 */5 * * * *', async () => {
           }
         })
   
-        sql.query("TRUNCATE dpipes", (err, results)=>{
+        await sql.query("TRUNCATE dpipes_aux", (err, results)=>{
           if(err){
             console.log(err)
           }
         })
         for(let i = 0; i < csv.length; i++){
           if(csv[i].spo === "true"){
-            sql.query('UPDATE misoctrls LEFT JOIN dpipes_view ON misoctrls.isoid COLLATE utf8mb4_unicode_ci = dpipes_view.isoid SET spo = 1 WHERE dpipes_view.tag = ?', [csv[i].tag], (err, results)=>{
+            await sql.query('UPDATE misoctrls LEFT JOIN dpipes_view ON misoctrls.isoid COLLATE utf8mb4_unicode_ci = dpipes_view.isoid SET spo = 1 WHERE dpipes_view.tag = ?', [csv[i].tag], (err, results)=>{
               if(err){
                 console.log("Error updating")
               }
             })
           }
           if(csv[i].area != '' && csv[i].area != null && !csv[i].tag.includes("/") && !csv[i].tag.includes("=") && !csv[i].diameter != null){
-            sql.query("SELECT id FROM areas WHERE name = ?", [csv[i].area], (err, results) =>{
+            await sql.query("SELECT id FROM areas WHERE name = ?", [csv[i].area], async(err, results) =>{
               let areaid = null
               if(results[0]){
                 areaid = results[0].id
               }
               if(process.env.NODE_MMDN == 1){
-                sql.query("SELECT id FROM diameters WHERE nps = ?", [csv[i].diameter], (err, results) =>{
+                await sql.query("SELECT id FROM diameters WHERE nps = ?", [csv[i].diameter], async(err, results) =>{
                   if(!results[0]){
                   }else{
                     const diameterid = results[0].id
@@ -73,7 +73,7 @@ cron.schedule('0 */5 * * * *', async () => {
                         tl = 2
                       }
                     }
-                    sql.query("INSERT INTO dpipes(area_id, tag, diameter_id, calc_notes, tpipes_id, diameter, calc_notes_description, pid, stress_level, insulation, unit, fluid, seq, train, spec) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", [areaid, csv[i].tag, diameterid, calc_notes, tl, csv[i].diameter, csv[i].calc_notes, csv[i].pid, csv[i].stresslevel, csv[i].insulation, csv[i].unit, csv[i].fluid, csv[i].seq, csv[i].train, csv[i].spec], (err, results)=>{
+                    await sql.query("INSERT INTO dpipes_aux(area_id, tag, diameter_id, calc_notes, tpipes_id, diameter, calc_notes_description, pid, stress_level, insulation, unit, fluid, seq, train, spec) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", [areaid, csv[i].tag, diameterid, calc_notes, tl, csv[i].diameter, csv[i].calc_notes, csv[i].pid, csv[i].stresslevel, csv[i].insulation, csv[i].unit, csv[i].fluid, csv[i].seq, csv[i].train, csv[i].spec], (err, results)=>{
                       if(err){
                         console.log(err)
                       }
@@ -81,7 +81,7 @@ cron.schedule('0 */5 * * * *', async () => {
                   }
                 })
               }else{
-                sql.query("SELECT id FROM diameters WHERE dn = ?", [csv[i].diameter], (err, results) =>{
+                await sql.query("SELECT id FROM diameters WHERE dn = ?", [csv[i].diameter], async(err, results) =>{
                   if(!results[0]){
   
                   }else{
@@ -102,7 +102,7 @@ cron.schedule('0 */5 * * * *', async () => {
                         tl = 2
                       }
                     }
-                    sql.query("INSERT INTO dpipes(area_id, tag, diameter_id, calc_notes, tpipes_id, diameter, calc_notes_description, pid, stress_level, insulation, unit, fluid, seq, train, spec) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", [areaid, csv[i].tag, diameterid, calc_notes, tl, csv[i].diameter, csv[i].calc_notes, csv[i].pid, csv[i].stresslevel, csv[i].insulation, csv[i].unit, csv[i].fluid, csv[i].seq, csv[i].train, csv[i].spec], (err, results)=>{
+                    await sql.query("INSERT INTO dpipes_aux(area_id, tag, diameter_id, calc_notes, tpipes_id, diameter, calc_notes_description, pid, stress_level, insulation, unit, fluid, seq, train, spec) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", [areaid, csv[i].tag, diameterid, calc_notes, tl, csv[i].diameter, csv[i].calc_notes, csv[i].pid, csv[i].stresslevel, csv[i].insulation, csv[i].unit, csv[i].fluid, csv[i].seq, csv[i].train, csv[i].spec], (err, results)=>{
                       if(err){
                         console.log(err)
                       }
@@ -115,9 +115,26 @@ cron.schedule('0 */5 * * * *', async () => {
             
           }
         }
-        console.log("Dpipes updated")
-  
+        
+        console.log("Dpipes_aux updated")
+        const timeoutDpipes = setTimeout(async () => {
+          await sql.query("TRUNCATE dpipes", async(err, results)=>{
+            if(err){
+              console.log(err)
+            }else{
+              await sql.query("INSERT INTO dpipes SELECT * FROM dpipes_aux", async(err, results)=>{
+                if(err){
+                  console.log(err)
+                }else{
+                  console.log("Dpipes ready")
+                }
+              })
+            }
+          })
+        }, 10000)
     })
+    
+
     const timeoutObj = setTimeout(() => {
       refreshProgress()
     }, 5000)

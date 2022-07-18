@@ -4,7 +4,7 @@ var format = require('date-format');
 var cron = require('node-cron');
 const csv=require('csvtojson')
 
-cron.schedule('0 */1 * * * *', async () => {
+cron.schedule('0 */5 * * * *', async () => {
     await uploadReportPeriod()
     const timeoutObj = setTimeout(() => {
       downloadIssuedTo3D()
